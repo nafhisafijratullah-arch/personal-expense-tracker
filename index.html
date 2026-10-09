@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Personal Expense Tracker</title>
+<style>
+*{box-sizing:border-box}body{font:16px system-ui;margin:0;background:#f4f6fb;color:#202534}.wrap{max-width:950px;margin:35px auto;padding:20px}.hero,.panel{background:white;border:1px solid #e2e6ef;border-radius:16px;padding:22px;margin-bottom:16px}.hero{background:#17233d;color:white}h1{margin:0 0 8px}p{line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.stat{background:#f5f7fc;padding:16px;border-radius:12px}.stat strong{display:block;font-size:1.5rem;margin-top:6px}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}input,select,button{font:inherit;padding:11px;border:1px solid #ccd3e0;border-radius:9px}button{background:#3559d8;color:white;border:0;cursor:pointer}button.delete{background:#b52c43;padding:6px 10px}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{text-align:left;padding:11px;border-bottom:1px solid #e7eaf1}small{color:#6d7484}.muted{color:#d6def2}@media(max-width:600px){.wrap{margin:8px;padding:10px}table{font-size:13px}}
+</style></head><body><main class="wrap">
+<section class="hero"><h1>Personal Expense Tracker</h1><p class="muted">A small working demo for recording expenses and reviewing monthly spending. Data is stored in this browser.</p></section>
+<section class="grid"><div class="stat">Total expenses<strong id="total">Rp0</strong></div><div class="stat">Transactions<strong id="count">0</strong></div><div class="stat">Largest category<strong id="category">—</strong></div></section>
+<section class="panel"><h2>Add a transaction</h2><form id="form"><input id="description" placeholder="Description (e.g. lunch)" required><input id="amount" type="number" min="1" placeholder="Amount (IDR)" required><select id="categoryInput"><option>Food</option><option>Transport</option><option>Study</option><option>Bills</option><option>Shopping</option><option>Other</option></select><input id="date" type="date" required><button>Add expense</button></form></section>
+<section class="panel"><h2>Transactions</h2><div style="overflow:auto"><table><thead><tr><th>Description</th><th>Category</th><th>Date</th><th>Amount</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<p><button id="clear" type="button" style="background:#6d7484">Clear all demo data</button><button id="export" type="button">Export to CSV</button></p><small>Demo note: this prototype uses localStorage and is not a financial product.</small></section>
+</main><script>
+const $=id=>document.getElementById(id);const money=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
+let items=JSON.parse(localStorage.getItem('expenses-demo')||'[]');$('date').value=new Date().toISOString().slice(0,10);
+function render(){localStorage.setItem('expenses-demo',JSON.stringify(items));$('total').textContent=money(items.reduce((s,x)=>s+x.amount,0));$('count').textContent=items.length;let cats={};items.forEach(x=>cats[x.category]=(cats[x.category]||0)+x.amount);$('category').textContent=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';$('rows').innerHTML=items.map(x=>`<tr><td>${esc(x.description)}</td><td>${x.category}</td><td>${x.date}</td><td>${money(x.amount)}</td><td><button class="delete" onclick="removeItem('${x.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="5">No transactions yet. Add one above.</td></tr>'}
+function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('form').addEventListener('submit',e=>{e.preventDefault();items.unshift({id:crypto.randomUUID(),description:$('description').value.trim(),amount:Number($('amount').value),category:$('categoryInput').value,date:$('date').value});$('description').value='';$('amount').value='';render()});
+
+window.removeItem = id => {
+  items = items.filter(x => x.id !== id);
+  render();
+};
+
+$('clear').onclick = () => {
+  if (confirm('Delete all demo transactions?')) {
+    items = [];
+    render();
+  }
+};
+
+$('export').onclick = () => {
+  const headers = ['Description', 'Category', 'Date', 'Amount'];
+  const rows = items.map(x => [
+    x.description, x.category, x.date, x.amount
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(value =>
+      '"' + String(value ?? '').replace(/"/g, '""') + '"'
+    ).join(','))
+    .join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + csv], {
+    type: 'text/csv;charset=utf-8;'
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'expenses.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+render();
+</script></body></html>
